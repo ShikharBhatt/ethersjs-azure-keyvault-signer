@@ -1,3 +1,4 @@
+import {AccessToken} from '@azure/identity';
 import {ethers, UnsignedTransaction} from 'ethers';
 import {getEthereumAddress,
   getPublicKey,
@@ -5,24 +6,29 @@ import {getEthereumAddress,
   determineCorrectV,
 } from './util/azure_utils';
 
+/**
+ * azure key vault parameters required to
+ * instantiate an instance of AzureKeyVaultSigner
+ */
 export interface AzureKeyVaultCredentials {
   keyName: string;
-  vaultName: string;
-  clientId: string;
-  clientSecret: string;
-  tenantId: string;
+  vaultUrl: string;
+  clientId?: string;
+  tenantId?: string;
+  clientSecret?: string;
+  clientCertificatePath?: string;
+  accessToken?: AccessToken;
   keyVersion?: string
 }
 
 /**
- *
+ * class implementing ethers Signer methods for keys stored in Azure Key Vault
  */
 export class AzureKeyVaultSigner extends ethers.Signer {
   keyVaultCredentials: AzureKeyVaultCredentials;
   ethereumAddress: string;
 
   /**
-   *
    * @param {AzureKeyVaultCredentials} keyVaultCredentials
    * @param {ethers.providers.Provider} provider
    */
@@ -35,7 +41,7 @@ export class AzureKeyVaultSigner extends ethers.Signer {
   }
 
   /**
-   *
+   * Returns Ethereum address for an azure key-vault SECP256-K1 key
    * @return {string}
    */
   async getAddress(): Promise<string> {
@@ -47,7 +53,8 @@ export class AzureKeyVaultSigner extends ethers.Signer {
   }
 
   /**
-   *
+   * Signs the digest buffer with an azure key-vault SECP-256K1 key
+   * and returns signature
    * @param {string} digestString
    * @return {any}
    */
@@ -65,7 +72,7 @@ export class AzureKeyVaultSigner extends ethers.Signer {
   }
 
   /**
-   *
+   * Signs a string or byte array with an azure keyvault SECP-256K1 key
    * @param {string | ethers.utils.Bytes} message
    * @return {string}
    */
@@ -74,6 +81,7 @@ export class AzureKeyVaultSigner extends ethers.Signer {
   }
 
   /**
+   * Signs and serializes a transaction with an azure keyvault SECP-256K1 key
    * @param {ethers.utils.Deferrable<ethers.providers.
    * TransactionRequest>} transaction
    * @return {string}
@@ -82,6 +90,8 @@ export class AzureKeyVaultSigner extends ethers.Signer {
   ethers.utils.Deferrable<ethers.providers.TransactionRequest>):
   Promise<string> {
     const unsignedTx = await ethers.utils.resolveProperties(transaction);
+    // ethers.js v5 doesn't support 'from' field in transaction
+    delete unsignedTx['from'];
     const serializedTx = ethers.utils.serializeTransaction(
         <UnsignedTransaction>unsignedTx);
     const transactionSignature = await this._signDigest(
@@ -91,6 +101,7 @@ export class AzureKeyVaultSigner extends ethers.Signer {
   }
 
   /**
+   * Facilitates connection to a web3 provider
    * @param {ethers.providers.Provider} provider
    * @return {AzureKeyVaultSigner}
    */
